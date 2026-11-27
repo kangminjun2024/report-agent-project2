@@ -84,16 +84,6 @@ def readonly_transaction(
                 text("SET TRANSACTION READ ONLY")
             )
 
-            # Apply timeout to the current transaction.
-            connection.execute(
-                text(
-                    "SELECT set_config("
-                    "'statement_timeout', :timeout, true)"
-                ),
-                {
-                    "timeout": "10000",
-                },
-            )
             yield connection
 
     except Exception:
