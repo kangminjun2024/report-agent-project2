@@ -86,22 +86,40 @@ def build_runtime(
     config.validate()
 
     # 2. Create PostgreSQL Engine
-    engine = create_engine(
-        config.DATABASE_URL,
-        pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-        pool_timeout=max(
-            1,
-            config.DB_TIMEOUT_MS // 1000,
-        ),
-        connect_args={
-            "connect_timeout": max(
-                1,
-                config.DB_TIMEOUT_MS // 1000,
+    engine = create_db_engine(config)
+
+    try:
+
+        # 3. Select CUDA device
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA is not available."
             )
-        },
-    )
+
+        device = torch.device("cuda:0")
+
+        # 4. Create Repository
+        repository = ReportRepository(engine)
+
+        # 5. Assemble Runtime
+        runtime = Runtime(
+            settings=config,
+            db_engine=engine,
+            device=device,
+            repository=repository,
+        )
+
+        runtime.health_checks = runtime.get_health_checks()
+
+        logger.info("Runtime successfully created")
+
+        return runtime
+
+    except Exception:
+
+        engine.dispose()
+
+        raise
 
     # 3. Select CUDA device
     if not torch.cuda.is_available():
