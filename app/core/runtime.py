@@ -1,4 +1,3 @@
-
 """
 Application Runtime
 
@@ -21,34 +20,26 @@ Future stages:
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable
-
 import torch
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-
 from app.core.settings import Settings, settings
 from app.core.preflight import (
     check_database,
     check_gpu,
 )
 
-
 logger = logging.getLogger(__name__)
-
 
 # ============================================================
 # 1. Runtime Container
 # ============================================================
-
 @dataclass
 class Runtime:
 
     settings: Settings
-
     db_engine: Engine
-
     device: torch.device
-
     health_checks: dict[str, Callable] = field(
         default_factory=dict
     )
@@ -66,9 +57,7 @@ class Runtime:
     # --------------------------------------------------------
     # Health Check
     # --------------------------------------------------------
-
     def get_health_checks(self) -> dict:
-
         return {
             "database": lambda: check_database(
                 self.db_engine
@@ -79,26 +68,20 @@ class Runtime:
     # --------------------------------------------------------
     # Cleanup
     # --------------------------------------------------------
-
     def close(self) -> None:
 
         logger.info("Closing Runtime resources")
-
         self.db_engine.dispose()
-
         logger.info("Runtime resources closed")
-
 
 # ============================================================
 # 2. Runtime Builder
 # ============================================================
-
 def build_runtime(
     config: Settings = settings,
 ) -> Runtime:
 
     logger.info("Building application runtime")
-
     # 1. Validate settings
     config.validate()
 
@@ -122,9 +105,7 @@ def build_runtime(
 
     # 3. Select CUDA device
     if not torch.cuda.is_available():
-
         engine.dispose()
-
         raise RuntimeError(
             "CUDA is not available. "
             "Please check the PyTorch GPU installation."
@@ -145,7 +126,6 @@ def build_runtime(
     )
 
     runtime.health_checks = runtime.get_health_checks()
-
     logger.info("Runtime successfully created")
 
     return runtime
