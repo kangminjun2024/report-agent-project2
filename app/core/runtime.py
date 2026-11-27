@@ -21,8 +21,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable
 import torch
-from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from app.db.connection import create_db_engine
+from app.db.repository import ReportRepository
 from app.core.settings import Settings, settings
 from app.core.preflight import (
     check_database,
@@ -40,17 +41,16 @@ class Runtime:
     settings: Settings
     db_engine: Engine
     device: torch.device
+    repository: Any = None
     health_checks: dict[str, Callable] = field(
         default_factory=dict
     )
-
     # Future components
     embeddings: Any = None
     retriever: Any = None
     reranker: Any = None
     rag_pipeline: Any = None
     agent: Any = None
-
     # Advanced stage
     run_store: Any = None
 
