@@ -14,21 +14,20 @@ Run:
     uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 """
 
-
-import torch
-from sqlalchemy import create_engine, text
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from importlib import import_module
 import inspect
 import logging
 import time
 from typing import Any
 
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from importlib import import_module
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.runtime import build_runtime
 
 # ============================================================
 # 1. Logging
@@ -247,15 +246,11 @@ async def collect_health_status(app: FastAPI) -> dict:
 # 5. Application Lifespan
 # ============================================================
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application startup and shutdown lifecycle.
-
-    Heavy model initialization and database preparation
-    will eventually be delegated to core/runtime.py.
-
-    Do not load GPU models directly in this file.
     """
 
     logger.info("=" * 60)
@@ -263,40 +258,28 @@ async def lifespan(app: FastAPI):
     logger.info("Version: %s", APP_VERSION)
     logger.info("=" * 60)
 
-    # Shared application state
     app.state.started_at = time.time()
 
-    # Health check callbacks.
-    # These will be connected to preflight.py/runtime.py later.
-    app.state.health_checks = {
-        "database": check_database,
-        "gpu": check_gpu,
-    }
+    # Build shared application runtime
+    runtime = build_runtime()
 
-    # Runtime and run store will be injected later.
-    app.state.runtime = None
+    app.state.runtime = runtime
+
+    # Register health check callbacks
+    app.state.health_checks = runtime.health_checks
+
+    # Advanced stage
     app.state.run_store = None
 
     logger.info("Application startup completed")
 
-    yield
+    try:
+        yield
 
-    # Shutdown
-    logger.info("Shutting down %s", APP_NAME)
-
-    runtime = getattr(app.state, "runtime", None)
-
-    if runtime is not None:
-        close_method = getattr(runtime, "aclose", None)
-
-        if close_method is not None:
-            result = close_method()
-
-            if inspect.isawaitable(result):
-                await result
-
-    logger.info("Application shutdown completed")
-
+    finally:
+        logger.info("Shutting down %s", APP_NAME)
+        runtime.close()
+        logger.info("Application shutdown completed")
 
 # ============================================================
 # 6. FastAPI Application
